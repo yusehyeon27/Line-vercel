@@ -1,8 +1,10 @@
 // auth/tokenManager.js
+
 import "dotenv/config";
-import puppeteer from "puppeteer";
 import axios from "axios";
 import { URL } from "url";
+import fs from "fs/promises";
+import path from "path";
 
 const AUTH_URL = "https://auth.worksmobile.com/oauth2/v2.0/authorize";
 const TOKEN_URL = "https://auth.worksmobile.com/oauth2/v2.0/token";
@@ -11,9 +13,11 @@ const clientId = process.env.CLIENT_ID;
 const redirectUri = process.env.REDIRECT_URI;
 const scope = process.env.SCOPE;
 const clientSecret = process.env.CLIENT_SECRET;
-const MODE = process.env.MODE || "manual"; // auto or manual
 
-function buildAuthUrl() {
+const TOKEN_STORE = path.join(process.cwd(), ".tokens.json");
+
+// --- OAuth URL 생성 ---
+export function buildAuthUrl() {
   const params = new URL(AUTH_URL);
   params.searchParams.set("client_id", clientId);
   params.searchParams.set("redirect_uri", redirectUri);
@@ -22,10 +26,11 @@ function buildAuthUrl() {
     Array.isArray(scope) ? scope.join(" ") : scope.replace(/,/g, " ")
   );
   params.searchParams.set("response_type", "code");
-  params.searchParams.set("state", "puppeteer_state");
+  params.searchParams.set("state", "manual_state");
   return params.toString();
 }
 
+// --- 코드로 토큰 교환 ---
 async function exchangeCodeForToken(code) {
   const params = new URLSearchParams();
   params.append("grant_type", "authorization_code");
@@ -40,71 +45,60 @@ async function exchangeCodeForToken(code) {
   return res.data;
 }
 
-/**
- * Puppeteerを使ってLINE WORKSにログインし、アクセストークンを返す
- */
-export async function getAccessToken() {
-  console.log("🔑 LINE WORKS 認証開始...");
-
-  const authUrl = buildAuthUrl();
-  console.log("Authorize URL:", authUrl);
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-
+// --- 토큰 저장 (Vercel 배포용: 24시간 유효) ---
+export async function saveTokensToDisk(tokenData) {
   try {
-    const page = await browser.newPage();
-    await page.goto(authUrl, { waitUntil: "networkidle2" });
-
-    if (MODE === "auto" && process.env.LW_USER && process.env.LW_PASS) {
-      console.log("🔁 自動ログインモード");
-
-      // --- ユーザーID入力欄 ---
-      const userSelector = "input[name='user_id'], input[type='text']";
-      await page.waitForSelector(userSelector, { timeout: 10000 });
-      await page.type(userSelector, process.env.LW_USER, { delay: 50 });
-
-      // --- パスワード入力欄 ---
-      const passSelector = "input[name='password'], input[type='password']";
-      await page.waitForSelector(passSelector, { timeout: 10000 });
-      await page.type(passSelector, process.env.LW_PASS, { delay: 50 });
-
-      // --- ログインボタン ---
-      const loginBtn = await page.$("#loginBtn, button[type='submit']");
-      if (loginBtn) {
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: "networkidle2" }),
-          loginBtn.click(),
-        ]);
-      } else {
-        console.warn(
-          "⚠️ ログインボタンが見つかりませんでした。セレクタを確認してください。"
-        );
-      }
-
-      console.log("✅ 自動ログイン処理完了");
-    } else {
-      console.log("👋 手動ログインモード: ログインしてから続行します...");
-    }
-
-    await new Promise((r) => setTimeout(r, 1000));
-    await page.reload({ waitUntil: "networkidle2" });
-
-    const currentUrl = page.url();
-    const code = new URL(currentUrl).searchParams.get("code");
-    if (!code) throw new Error("認可コードが取得できませんでした");
-
-    console.log("✅ 認可コード取得:", code);
-
-    const tokenData = await exchangeCodeForToken(code);
-    console.log("✅ アクセストークン取得成功");
-    return tokenData;
+    const obj = {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: Date.now() + 24 * 60 * 60 * 1000, // 24시간
+    };
+    await fs.writeFile(TOKEN_STORE, JSON.stringify(obj, null, 2), "utf8");
   } catch (err) {
-    console.error("❌ 認証エラー:", err.message);
-    throw err;
-  } finally {
-    await browser.close();
+    console.warn("Could not save tokens to disk:", err.message || err);
   }
 }
+
+// --- 토큰 로드 ---
+async function loadTokensFromDisk() {
+  try {
+    const raw = await fs.readFile(TOKEN_STORE, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// --- refresh token으로 갱신 ---
+async function refreshAccessToken(refreshToken) {
+  const params = new URLSearchParams();
+  params.append("grant_type", "refresh_token");
+  params.append("refresh_token", refreshToken);
+  params.append("client_id", clientId);
+  params.append("client_secret", clientSecret);
+
+  const res = await axios.post(TOKEN_URL, params, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  return res.data;
+}
+
+// --- 서버용 액세스 토큰 ---
+export async function getServerAccessToken() {
+  const stored = await loadTokensFromDisk();
+  if (
+    stored?.access_token &&
+    stored.expires_at &&
+    Date.now() < stored.expires_at
+  ) {
+    return stored.access_token;
+  }
+  if (stored?.refresh_token) {
+    const newToken = await refreshAccessToken(stored.refresh_token);
+    await saveTokensToDisk(newToken);
+    return newToken.access_token;
+  }
+  throw new Error("No stored tokens available. Complete OAuth flow first.");
+}
+
+// --- 서버리스용 인터랙티브는 제거 (Vercel에서는 지원 안됨)

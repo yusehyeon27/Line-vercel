@@ -1,51 +1,37 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export default function HomePage() {
-  const router = useRouter();
+export default function ReservationPage() {
+  const [userList, setUserList] = useState([]);
 
-  const buttonStyle: React.CSSProperties = {
-    backgroundColor: "rgb(7, 181, 59)",
-    color: "#fff",
-    fontSize: "20px",
-    fontWeight: "bold",
-    padding: "20px 40px",
-    borderRadius: "12px",
-    border: "none",
-    cursor: "pointer",
-    width: "220px",
-    transition: "0.2s",
+  const handleLogin = () => {
+    const authUrl = new URL(
+      "https://auth.worksmobile.com/oauth2/v2.0/authorize"
+    );
+    authUrl.searchParams.set("client_id", process.env.NEXT_PUBLIC_CLIENT_ID!);
+    authUrl.searchParams.set(
+      "redirect_uri",
+      process.env.NEXT_PUBLIC_REDIRECT_URI!
+    );
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("scope", process.env.NEXT_PUBLIC_SCOPE!);
+    authUrl.searchParams.set("state", "lineworks_oauth");
+    // redirect to LINE WORKS OAuth
+    window.location.href = authUrl.toString();
   };
-
-  const containerStyle: React.CSSProperties = {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-    gap: "40px",
-    backgroundColor: "#f7f7f7",
-  };
+  // NOTE: do not log secrets or client ids in production
 
   return (
-    <div style={containerStyle}>
+    <div>
+      <h1>LINEWORKS ログイン</h1>
       <button
-        style={buttonStyle}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        onClick={() => router.push("/reservation")}
+        onClick={handleLogin}
+        className="px-4 py-2 bg-blue-500 text-white rounded"
       >
-        予約ページへ
+        ログイン
       </button>
-
-      <button
-        style={buttonStyle}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        onClick={() => router.push("/reservation-list")}
-      >
-        予約一覧へ
-      </button>
+      {/* debug URL removed */}
     </div>
   );
 }

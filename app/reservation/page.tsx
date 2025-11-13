@@ -19,6 +19,13 @@ export default function ReservationPage() {
 
   const router = useRouter();
   const [sendTime, setSendTime] = useState<Date | null>(null);
+  const [showEmployeeList, setShowEmployeeList] = useState(false);
+  const [employees, setEmployees] = useState<
+    Array<{ userId: string; userName: string }>
+  >([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const selectedNames = formData.personal ? formData.personal.split("、") : [];
 
   // 現在時間基準, 最小時間計算
   const getMinTime = (date: Date) => {
@@ -66,19 +73,55 @@ export default function ReservationPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const openChildWindow = () => {
-    (window as any).__SELECTED_EMPLOYEES__ = formData.personalIds.map(
-      (id, i) => ({
-        userId: id,
-        name: formData.personal.split("、")[i] || "",
-      })
-    );
+  const fetchEmployees = async () => {
+    setLoadingEmployees(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok && data.users) {
+        setEmployees(data.users);
+        setShowEmployeeList(true);
+      } else {
+        alert("社員リストを取得できませんでした");
+      }
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      alert("通信エラーが発生しました");
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
 
-    window.open(
-      "/select",
-      "childWindow",
-      "width=600,height=800,resizable=no,scrollbars=yes"
-    );
+  const handleSelectEmployee = (employee: {
+    userId: string;
+    userName: string;
+  }) => {
+    const ids = [...formData.personalIds];
+    const names = formData.personal ? formData.personal.split("、") : [];
+
+    const index = ids.indexOf(employee.userId);
+    if (index > -1) {
+      // 既に選択された社員 → 削除
+      ids.splice(index, 1);
+      names.splice(index, 1);
+    } else {
+      // 新しい社員を追加
+      ids.push(employee.userId);
+      names.push(employee.userName);
+    }
+
+    setFormData({
+      ...formData,
+      personalIds: ids,
+      personal: names.join("、"),
+    });
+  };
+
+  const isEmployeeSelected = (userId: string) => {
+    return formData.personalIds.includes(userId);
   };
 
   const handleSubmit = async () => {
@@ -198,7 +241,7 @@ export default function ReservationPage() {
                   <Search
                     size={20}
                     style={{ cursor: "pointer" }}
-                    onClick={openChildWindow}
+                    onClick={fetchEmployees}
                   />
                 </div>
               </td>
@@ -268,6 +311,218 @@ export default function ReservationPage() {
         </table>
       </main>
 
+      {/* 社員リストモーダル */}
+      {showEmployeeList && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "8px",
+              width: "400px",
+              maxHeight: "80vh",
+              display: "flex",
+              flexDirection: "column",
+              padding: "20px",
+            }}
+          >
+            {/* タイトル */}
+            <h1
+              style={{
+                fontSize: "20px",
+                fontWeight: "bold",
+                marginBottom: "20px",
+                margin: 0,
+              }}
+            >
+              社員を選択
+            </h1>
+
+            {/* 検索バー */}
+            <input
+              type="text"
+              placeholder="検索"
+              value={employeeSearch}
+              onChange={(e) => setEmployeeSearch(e.target.value)}
+              style={{
+                width: "100%",
+                height: "50px",
+                marginBottom: "20px",
+                borderRadius: "8px",
+                fontSize: "16px",
+                color: "#999",
+                border: "1px solid #ccc",
+                padding: "0 8px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            {/* 候補リスト */}
+            <div
+              style={{
+                overflowY: "auto",
+                height: "200px",
+                width: "100%",
+                borderRadius: "8px",
+                fontSize: "16px",
+                color: "black",
+                border: "1px solid #ccc",
+                padding: "8px",
+                boxSizing: "border-box",
+                marginBottom: "20px",
+              }}
+            >
+              {loadingEmployees ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "20px",
+                    color: "#999",
+                  }}
+                >
+                  読み込み中...
+                </div>
+              ) : employees.length > 0 ? (
+                <div>
+                  {employees
+                    .filter((emp) => {
+                      const q = employeeSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        (emp.userName || "").toLowerCase().includes(q) ||
+                        (emp.userId || "").toLowerCase().includes(q)
+                      );
+                    })
+                    .map((employee) => (
+                      <label
+                        key={employee.userId}
+                        style={{
+                          display: "block",
+                          marginBottom: "8px",
+                          cursor: "pointer",
+                          border: "1px solid #eee",
+                          borderRadius: "4px",
+                          padding: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isEmployeeSelected(employee.userId)}
+                            onChange={() => handleSelectEmployee(employee)}
+                            style={{ cursor: "pointer", flex: "0 0 auto" }}
+                          />
+                          <span style={{ fontSize: "14px" }}>
+                            {employee.userName}
+                          </span>
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "20px",
+                    color: "#999",
+                  }}
+                >
+                  該当する社員がいません
+                </div>
+              )}
+            </div>
+
+            {/* 選択されている社員 */}
+            <div
+              style={{
+                border: "1px solid #ccc",
+                width: "100%",
+                minHeight: "100px",
+                marginBottom: "20px",
+                borderRadius: "8px",
+                fontSize: "16px",
+                color: "#999",
+                padding: "8px",
+                boxSizing: "border-box",
+                overflowY: "auto",
+              }}
+            >
+              {formData.personalIds.length > 0 ? (
+                <p style={{ margin: 0, wordBreak: "break-word" }}>
+                  {formData.personal}
+                </p>
+              ) : (
+                <p style={{ margin: 0, color: "#ccc" }}>
+                  選択されている社員はいません
+                </p>
+              )}
+            </div>
+
+            {/* ボタン */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                onClick={() => setShowEmployeeList(false)}
+                style={{
+                  backgroundColor: "#999",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 25px",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  if (formData.personalIds.length === 0) {
+                    alert("社員を選択してください。");
+                    return;
+                  }
+                  setShowEmployeeList(false);
+                }}
+                style={{
+                  backgroundColor: "#4CAF50",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 25px",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                }}
+              >
+                完了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -294,6 +549,16 @@ const tdStyle: React.CSSProperties = {
   borderBottom: "1px solid #eee",
   padding: "10px",
 };
+
+const buttonStyle: React.CSSProperties = {
+  color: "white",
+  border: "none",
+  padding: "8px 16px",
+  borderRadius: "4px",
+  cursor: "pointer",
+  fontSize: "14px",
+};
+
 const buttonStyleGreen: React.CSSProperties = {
   backgroundColor: "#4CAF50",
   color: "white",

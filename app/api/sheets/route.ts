@@ -71,7 +71,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     } else if (personal && group) {
-      // 둘 다 입력되면 에러
       return NextResponse.json(
         { error: "宛先は個人かグループのどちらかのみ選択してください。" },
         { status: 400 }

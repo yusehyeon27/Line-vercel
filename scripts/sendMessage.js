@@ -1,27 +1,25 @@
 // scripts/sendMessage.js
-import { getAccessToken } from "../auth/tokenManager.js";
-import axios from "axios";
+
+import { getServerAccessToken } from "../auth/tokenManager.js";
+import sendPendingMessages from "../lib/sendWorker.js";
+import dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
 
 (async () => {
   try {
     console.log("🚀 メッセージ送信プロセス開始...");
-    const tokenData = await getAccessToken();
-    const accessToken = tokenData.access_token;
+    let accessToken = "";
+    try {
+      accessToken = await getServerAccessToken();
+    } catch (e) {
+      throw new Error(
+        "サーバー保存トークンが見つかりません。まずブラウザで OAuth を完了してください。"
+      );
+    }
 
-    console.log(
-      "✅ アクセストークン取得成功:",
-      accessToken.slice(0, 20) + "..."
-    );
-
-    console.log("📤 スプレッドシートの送信待ちメッセージ送信開始...");
-
-    // ✅ Next.js APIにPOST要請
-    const res = await axios.post("http://localhost:3000/api/bot/send", {
-      accessToken,
-    });
-
-    console.log("✅ API応答:", res.data);
-    console.log("🎉 全ての送信処理完了");
+    console.log("📤 スプレッドシートの待機送信システムを開始します...");
+    const res = await sendPendingMessages(accessToken);
+    console.log("✅送信作業結果果:", res);
   } catch (err) {
     console.error("💥 メッセージ送信エラー:", err.message);
   }
