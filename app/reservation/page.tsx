@@ -82,6 +82,11 @@ export default function ReservationPage() {
       });
       const data = await res.json();
       if (res.ok && data.users) {
+        // ▼ userId の重複排除（最初の1つだけ残す）
+        const uniqueUsers = data.users.filter(
+          (v: any, i: number, self: any[]) =>
+            i === self.findIndex((u) => u.userId === v.userId)
+        );
         setEmployees(data.users);
         setShowEmployeeList(true);
       } else {
