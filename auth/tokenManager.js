@@ -31,6 +31,22 @@ export function buildAuthUrl() {
 }
 
 // --- トークン保存　---
+// --- コードでトークン交換 ---
+async function exchangeCodeForToken(code) {
+  const params = new URLSearchParams();
+  params.append("grant_type", "authorization_code");
+  params.append("code", code);
+  params.append("client_id", clientId);
+  params.append("client_secret", clientSecret);
+  params.append("redirect_uri", redirectUri);
+
+  const res = await axios.post(TOKEN_URL, params, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  return res.data;
+}
+
+// --- トークン更新 ---
 export async function saveTokensToDisk(tokenData) {
   try {
     const obj = {
