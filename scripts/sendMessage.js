@@ -19,7 +19,7 @@ dotenv.config({ path: "./.env" });
 
     console.log("📤 スプレッドシートの待機送信システムを開始します...");
     const res = await sendPendingMessages(accessToken);
-    console.log("✅送信作業結果果:", res);
+    console.log("✅送信作業結果:", res);
   } catch (err) {
     console.error("💥 メッセージ送信エラー:", err.message);
   }
