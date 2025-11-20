@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const sheets = google.sheets({ version: "v4", auth });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: "A1:G150",
+      range: "A1:G500",
     });
 
     const rows = res.data.values || [];
