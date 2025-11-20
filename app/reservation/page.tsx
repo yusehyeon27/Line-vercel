@@ -1,5 +1,4 @@
 // reservation/page.tsx
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -25,9 +24,14 @@ export default function ReservationPage() {
   >([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
+
+  // モダル用一時選択state
+  const [modalSelectedIds, setModalSelectedIds] = useState<string[]>([]);
+  const [modalSelectedNames, setModalSelectedNames] = useState<string[]>([]);
+
   const selectedNames = formData.personal ? formData.personal.split("、") : [];
 
-  // 現在時間基準, 最小時間計算
+  // 現在時間基準最大・最小時間計算設定
   const getMinTime = (date: Date) => {
     const now = new Date();
     const minTime = new Date(date);
@@ -37,12 +41,10 @@ export default function ReservationPage() {
       date.getMonth() === now.getMonth() &&
       date.getDate() === now.getDate()
     ) {
-      // 当日なら現在時間と9時で大きい方
       const nextHour = new Date();
       nextHour.setHours(now.getHours() + 1, 0, 0, 0);
       minTime.setHours(Math.max(nextHour.getHours(), 9), 0, 0, 0);
     } else {
-      // 今日じゃなかったら9時から
       minTime.setHours(9, 0, 0, 0);
     }
     return minTime;
@@ -54,6 +56,7 @@ export default function ReservationPage() {
     return maxTime;
   };
 
+  // window.messageイベント
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -73,6 +76,17 @@ export default function ReservationPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  // モダルを開く時にformDataをmodal stateで初期化
+  useEffect(() => {
+    if (showEmployeeList) {
+      setModalSelectedIds([...formData.personalIds]);
+      setModalSelectedNames(
+        formData.personal ? formData.personal.split("、") : []
+      );
+    }
+  }, [showEmployeeList]);
+
+  // 社員リストfetch
   const fetchEmployees = async () => {
     setLoadingEmployees(true);
     try {
@@ -82,7 +96,6 @@ export default function ReservationPage() {
       });
       const data = await res.json();
       if (res.ok && data.users) {
-        // ▼ userId の重複排除（最初の1つだけ残す）
         const uniqueUsers = data.users.filter(
           (v: any, i: number, self: any[]) =>
             i === self.findIndex((u) => u.userId === v.userId)
@@ -100,35 +113,31 @@ export default function ReservationPage() {
     }
   };
 
+  // モダルチェックボックス選択
   const handleSelectEmployee = (employee: {
     userId: string;
     userName: string;
   }) => {
-    const ids = [...formData.personalIds];
-    const names = formData.personal ? formData.personal.split("、") : [];
-
+    const ids = [...modalSelectedIds];
+    const names = [...modalSelectedNames];
     const index = ids.indexOf(employee.userId);
+
     if (index > -1) {
-      // 既に選択された社員 → 削除
       ids.splice(index, 1);
       names.splice(index, 1);
     } else {
-      // 新しい社員を追加
       ids.push(employee.userId);
       names.push(employee.userName);
     }
 
-    setFormData({
-      ...formData,
-      personalIds: ids,
-      personal: names.join("、"),
-    });
+    setModalSelectedIds(ids);
+    setModalSelectedNames(names);
   };
 
-  const isEmployeeSelected = (userId: string) => {
-    return formData.personalIds.includes(userId);
-  };
+  const isEmployeeSelected = (userId: string) =>
+    modalSelectedIds.includes(userId);
 
+  // 提出
   const handleSubmit = async () => {
     try {
       const res = await fetch("/api/sheets", {
@@ -343,7 +352,6 @@ export default function ReservationPage() {
               padding: "20px",
             }}
           >
-            {/* タイトル */}
             <h1
               style={{
                 fontSize: "20px",
@@ -355,7 +363,7 @@ export default function ReservationPage() {
               社員を選択
             </h1>
 
-            {/* 検索バー */}
+            {/* 검색 */}
             <input
               type="text"
               placeholder="検索"
@@ -374,7 +382,7 @@ export default function ReservationPage() {
               }}
             />
 
-            {/* 候補リスト */}
+            {/* 후보 리스트 */}
             <div
               style={{
                 overflowY: "auto",
@@ -400,48 +408,46 @@ export default function ReservationPage() {
                   読み込み中...
                 </div>
               ) : employees.length > 0 ? (
-                <div>
-                  {employees
-                    .filter((emp) => {
-                      const q = employeeSearch.trim().toLowerCase();
-                      if (!q) return true;
-                      return (
-                        (emp.userName || "").toLowerCase().includes(q) ||
-                        (emp.userId || "").toLowerCase().includes(q)
-                      );
-                    })
-                    .map((employee) => (
-                      <label
-                        key={employee.userId}
+                employees
+                  .filter((emp) => {
+                    const q = employeeSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      (emp.userName || "").toLowerCase().includes(q) ||
+                      (emp.userId || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((employee) => (
+                    <label
+                      key={employee.userId}
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        cursor: "pointer",
+                        border: "1px solid #eee",
+                        borderRadius: "4px",
+                        padding: "8px",
+                      }}
+                    >
+                      <div
                         style={{
-                          display: "block",
-                          marginBottom: "8px",
-                          cursor: "pointer",
-                          border: "1px solid #eee",
-                          borderRadius: "4px",
-                          padding: "8px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isEmployeeSelected(employee.userId)}
-                            onChange={() => handleSelectEmployee(employee)}
-                            style={{ cursor: "pointer", flex: "0 0 auto" }}
-                          />
-                          <span style={{ fontSize: "14px" }}>
-                            {employee.userName}
-                          </span>
-                        </div>
-                      </label>
-                    ))}
-                </div>
+                        <input
+                          type="checkbox"
+                          checked={isEmployeeSelected(employee.userId)}
+                          onChange={() => handleSelectEmployee(employee)}
+                          style={{ cursor: "pointer", flex: "0 0 auto" }}
+                        />
+                        <span style={{ fontSize: "14px" }}>
+                          {employee.userName}
+                        </span>
+                      </div>
+                    </label>
+                  ))
               ) : (
                 <div
                   style={{
@@ -455,7 +461,7 @@ export default function ReservationPage() {
               )}
             </div>
 
-            {/* 選択されている社員 */}
+            {/* 선택된 사원 */}
             <div
               style={{
                 border: "1px solid #ccc",
@@ -470,9 +476,9 @@ export default function ReservationPage() {
                 overflowY: "auto",
               }}
             >
-              {formData.personalIds.length > 0 ? (
+              {modalSelectedIds.length > 0 ? (
                 <p style={{ margin: 0, wordBreak: "break-word" }}>
-                  {formData.personal}
+                  {modalSelectedNames.join("、")}
                 </p>
               ) : (
                 <p style={{ margin: 0, color: "#ccc" }}>
@@ -505,10 +511,15 @@ export default function ReservationPage() {
               </button>
               <button
                 onClick={() => {
-                  if (formData.personalIds.length === 0) {
+                  if (modalSelectedIds.length === 0) {
                     alert("社員を選択してください。");
                     return;
                   }
+                  setFormData({
+                    ...formData,
+                    personalIds: modalSelectedIds,
+                    personal: modalSelectedNames.join("、"),
+                  });
                   setShowEmployeeList(false);
                 }}
                 style={{
@@ -528,6 +539,7 @@ export default function ReservationPage() {
         </div>
       )}
 
+      {/* 予約画面ボタン */}
       <div
         style={{
           display: "flex",
@@ -555,15 +567,6 @@ const tdStyle: React.CSSProperties = {
   padding: "10px",
 };
 
-const buttonStyle: React.CSSProperties = {
-  color: "white",
-  border: "none",
-  padding: "8px 16px",
-  borderRadius: "4px",
-  cursor: "pointer",
-  fontSize: "14px",
-};
-
 const buttonStyleGreen: React.CSSProperties = {
   backgroundColor: "#4CAF50",
   color: "white",
@@ -572,6 +575,7 @@ const buttonStyleGreen: React.CSSProperties = {
   borderRadius: "8px",
   cursor: "pointer",
 };
+
 const buttonStyleBlue: React.CSSProperties = {
   backgroundColor: "rgb(52, 152, 219)",
   color: "white",
