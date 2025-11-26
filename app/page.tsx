@@ -1,3 +1,4 @@
+// app/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -64,9 +65,6 @@ export default function ReservationPage() {
     transition: "opacity 0.2s",
   };
 
-  // ============================
-  // ⭐ return UI만 변경 (기능 0% 변경)
-  // ============================
   return (
     <div style={containerStyle}>
       <h1 style={headerStyle}>LINE WORKS ログイン</h1>

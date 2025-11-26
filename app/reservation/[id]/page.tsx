@@ -1,3 +1,4 @@
+// app/reservation/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -558,7 +559,7 @@ export default function ReservationEditPage() {
               }}
             >
               <button
-                onClick={() => setShowEmployeeList(false)}
+                onClick={() => window.location.reload()}
                 style={{
                   backgroundColor: "#999",
                   color: "white",

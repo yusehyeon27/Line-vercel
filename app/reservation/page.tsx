@@ -363,7 +363,7 @@ export default function ReservationPage() {
               社員を選択
             </h1>
 
-            {/* 검색 */}
+            {/* 検索 */}
             <input
               type="text"
               placeholder="検索"
@@ -382,7 +382,7 @@ export default function ReservationPage() {
               }}
             />
 
-            {/* 후보 리스트 */}
+            {/* 候補リスト */}
             <div
               style={{
                 overflowY: "auto",
@@ -461,7 +461,7 @@ export default function ReservationPage() {
               )}
             </div>
 
-            {/* 선택된 사원 */}
+            {/* 選択し社員員 */}
             <div
               style={{
                 border: "1px solid #ccc",

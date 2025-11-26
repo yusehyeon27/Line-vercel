@@ -2,8 +2,6 @@
 import cron from "node-cron";
 import { exec } from "child_process";
 
-// 5分ごとに実行
-//cron.schedule("*/5 * * * *", () => {
 // 60分ごとに実行
 cron.schedule("0 * * * *", () => {
   console.log("⏳ 60分ごとの sendMessage.js 実行開始...");
@@ -17,5 +15,4 @@ cron.schedule("0 * * * *", () => {
     console.error(stderr);
   });
 });
-//console.log("🟢 Cron スケジューラーが起動しました (5分ごとに実行)");
 console.log("🟢 Cron スケジューラーが起動しました (60分ごとに実行)");

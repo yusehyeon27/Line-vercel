@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  // Read accessToken from httpOnly cookie (set by /api/token)
+  // httpOnlyCookie(set by /api/token)からaccessToken読み込み
   const accessToken = req.cookies.get("accessToken")?.value;
 
   if (!accessToken) {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const users: Array<{ userId: string; userName: string }> = [];
     let cursor: string | null | undefined = undefined;
 
-    // Loop until nextCursor is null/empty
+    // nextCursorがnullにループすループする
     do {
       const url: string = cursor
         ? `https://www.worksapis.com/v1.0/users?cursor=${encodeURIComponent(
